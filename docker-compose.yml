@@ -1,0 +1,86 @@
+services:
+  mongodb:
+    image: mongo:7
+    container_name: hypesoft-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - hypesoft-network
+
+  mongo-express:
+    image: mongo-express:1.0.2
+    container_name: hypesoft-mongo-express
+    restart: unless-stopped
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongodb
+      ME_CONFIG_BASICAUTH: "false"
+    ports:
+      - "8081:8081"
+    depends_on:
+      - mongodb
+    networks:
+      - hypesoft-network
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: hypesoft-keycloak
+    restart: unless-stopped
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+    networks:
+      - hypesoft-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hypesoft-api
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__MongoDb: mongodb://mongodb:27017
+      MongoDbSettings__DatabaseName: hypesoft
+      Keycloak__Authority: http://keycloak:8080/realms/hypesoft
+      Keycloak__ValidAudience: account
+    ports:
+      - "5000:8080"
+    depends_on:
+      - mongodb
+      - keycloak
+    networks:
+      - hypesoft-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: hypesoft-frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: http://localhost:5000
+      VITE_KEYCLOAK_URL: http://localhost:8080
+      VITE_KEYCLOAK_REALM: hypesoft
+      VITE_KEYCLOAK_CLIENT_ID: hypesoft-frontend
+    ports:
+      - "3000:5173"
+    depends_on:
+      - backend
+    networks:
+      - hypesoft-network
+
+networks:
+  hypesoft-network:
+    driver: bridge
+
+volumes:
+  mongodb-data:
