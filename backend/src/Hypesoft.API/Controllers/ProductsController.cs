@@ -61,8 +61,28 @@ public class ProductsController : ControllerBase
         await _mediator.Send(new DeleteProductCommand(id));
         return NoContent();
     }
+
+    // Endpoint separado do Update geral - faz sentido ter uma acao dedicada pra
+    // "ajustar estoque" (o que o usuario realmente faz no dia a dia) em vez de
+    // obrigar a mandar produto inteiro de novo so pra mudar a quantidade.
+    [Authorize]
+    [HttpPatch("{id}/stock")]
+    public async Task<IActionResult> UpdateStock(string id, [FromBody] UpdateStockRequest request)
+    {
+        var updated = await _mediator.Send(new UpdateStockCommand(id, request.Quantity));
+        return Ok(updated);
+    }
+
+    [HttpGet("low-stock")]
+    public async Task<IActionResult> GetLowStock([FromQuery] int threshold = 10)
+    {
+        var products = await _mediator.Send(new GetLowStockProductsQuery(threshold));
+        return Ok(products);
+    }
 }
 
 // Request separado do Command aqui porque o Id vem da rota, nao do corpo -
 // fica mais claro pra quem consome a API do que reaproveitar o Command com Id vazio.
 public record UpdateProductRequest(string Name, string? Description, decimal Price, string CategoryId, int StockQuantity);
+
+public record UpdateStockRequest(int Quantity);
