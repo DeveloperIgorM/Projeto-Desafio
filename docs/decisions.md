@@ -18,3 +18,14 @@ O `docker-compose` sobe o Keycloak já com `keycloak/realm-export.json` importad
 
 ## Modelagem no MongoDB
 `Product` referencia `CategoryId` (sem "join"); quando o nome da categoria for necessário na listagem, é feito um lookup/agregação específico em vez de embutir o documento completo da categoria.
+
+
+## Keycloak: Authority (interno) vs. Issuer (externo)
+No `docker-compose`, o backend precisa buscar as chaves publicas do Keycloak (JWKS) usando o
+endereco interno da rede Docker (`http://keycloak:8080`). Porem, quem efetivamente loga
+(curl, Postman, navegador) acessa o Keycloak via `http://localhost:8080` (porta publicada),
+e e esse endereco que fica gravado no campo `iss` (issuer) de todo token emitido.
+Se os dois forem configurados como o mesmo valor, a validacao do token falha (401 silencioso).
+Por isso `Keycloak:Authority` (busca de chaves, endereco interno) e `Keycloak:ValidIssuer`
+(validacao do token, endereco externo) sao configurados separadamente em `appsettings.json`
+e no `docker-compose.yml`.

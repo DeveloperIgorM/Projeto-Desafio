@@ -51,6 +51,7 @@ services:
       ConnectionStrings__MongoDb: mongodb://mongodb:27017
       MongoDbSettings__DatabaseName: hypesoft
       Keycloak__Authority: http://keycloak:8080/realms/hypesoft
+      Keycloak__ValidIssuer: http://localhost:8080/realms/hypesoft
       Keycloak__ValidAudience: account
     ports:
       - "5000:8080"

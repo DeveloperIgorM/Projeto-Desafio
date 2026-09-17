@@ -43,7 +43,15 @@ builder.Services.AddCors(options =>
               .AllowAnyMethod());
 });
 
-var keycloakAuthority = builder.Configuration["Keycloak:Authority"] ?? "http://localhost:8080/realms/hypesoft";
+// Authority: endereco INTERNO (rede do docker-compose) usado pelo backend pra buscar
+// as chaves publicas do Keycloak (JWKS) em /.well-known/openid-configuration.
+var keycloakAuthority = builder.Configuration["Keycloak:Authority"] ?? "http://keycloak:8080/realms/hypesoft";
+
+// Issuer: endereco EXTERNO que o Keycloak realmente grava no campo "iss" dos tokens,
+// que e o endereco que o cliente (curl, frontend, Postman) usou pra fazer login (localhost:8080).
+// Os dois precisam ser configurados separadamente: o backend acessa o Keycloak via
+// rede interna do Docker ("keycloak"), mas quem loga acessa via "localhost" (porta publicada).
+var keycloakIssuer = builder.Configuration["Keycloak:ValidIssuer"] ?? "http://localhost:8080/realms/hypesoft";
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -54,7 +62,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             ValidateAudience = false, // TODO: restringir para o client id quando os clients/roles estiverem definitivos (Dia 2/3)
             ValidateIssuer = true,
-            ValidIssuer = keycloakAuthority
+            ValidIssuer = keycloakIssuer
         };
     });
 
