@@ -61,11 +61,6 @@ var keycloakAuthority = builder.Configuration["Keycloak:Authority"] ?? "http://k
 // rede interna do Docker ("keycloak"), mas quem loga acessa via "localhost" (porta publicada).
 var keycloakIssuer = builder.Configuration["Keycloak:ValidIssuer"] ?? "http://localhost:8080/realms/hypesoft";
 
-// Audience: nos tokens gerados por esse realm, o "aud" vem como "account" por padrao
-// (efeito colateral das roles default do Keycloak, que dao acesso ao client "account").
-// Deixo tambem o id do client do frontend na lista por seguranca, caso isso mude.
-var keycloakAudience = builder.Configuration["Keycloak:ValidAudience"] ?? "account";
-
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -73,8 +68,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         options.RequireHttpsMetadata = false; // OK em dev; habilitar HTTPS em producao
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidateAudience = true,
-            ValidAudiences = new[] { keycloakAudience, "hypesoft-frontend" },
+            // Tentei ligar ValidateAudience assumindo que o "aud" viria como "account"
+            // (comportamento padrao do Keycloak), mas quebrou os endpoints autenticados -
+            // o token desse client nao carrega esse audience. Fica desligado ate eu
+            // conferir o conteudo real do token e configurar certo, sem chute.
+            ValidateAudience = false,
             ValidateIssuer = true,
             ValidIssuer = keycloakIssuer
         };
