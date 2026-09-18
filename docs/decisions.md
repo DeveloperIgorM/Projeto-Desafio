@@ -24,3 +24,12 @@ Isso aqui vale registrar porque não é óbvio de primeira. O backend, rodando d
 
 ## Dashboard calculado em memória, sem aggregation pipeline
 Pra montar o resumo do dashboard (total de produtos, valor total em estoque, produtos por categoria) eu simplesmente busco todos os produtos e categorias e calculo em C# (`StockCalculator` + um `GroupBy`), em vez de montar uma aggregation pipeline no Mongo. Pro volume de dados desse desafio isso não faz diferença nenhuma de performance, e o código fica bem mais fácil de ler e de testar. Se o catálogo crescesse pra dezenas de milhares de produtos, aí sim valeria migrar isso pra uma pipeline no banco.
+
+## shadcn/ui montado na mão, sem o CLI
+Em vez de rodar `npx shadcn init`/`add` (que é interativo e não ia funcionar direito no meu fluxo de terminal remoto), copiei manualmente os componentes que precisava (Button, Input, Label, Card) seguindo o mesmo padrão que o CLI geraria. Junto com isso, não instalei os pacotes do Radix UI: os únicos componentes "complexos" que eu precisava (modal de criar/editar produto, modal de ajuste de estoque) resolvi com um componente de modal simples feito na mão, então não fazia sentido trazer mais uma dependência só pra isso.
+
+## Autorização por role no frontend
+Os dois usuários do realm (`igor` com admin+user, `usuario` só com user) dão pra mostrar isso na prática: quem não tem a role `admin` visualiza produtos e categorias normalmente, mas não vê os botões de criar/editar/excluir nem consegue ajustar estoque. É simples, mas cobre o requisito de "autorização baseada em roles do Keycloak" sem eu precisar montar uma tela de gestão de permissões completa.
+
+## Login forçado (onLoad: 'login-required')
+Preferi deixar o Keycloak barrar o acesso à aplicação inteira antes dela renderizar, em vez de deixar entrar e só bloquear rotas específicas depois. Pra um painel interno como esse faz mais sentido e simplifica a lógica de proteção de rota — não precisei de uma tela de "login" própria, o próprio Keycloak assume esse trabalho.
