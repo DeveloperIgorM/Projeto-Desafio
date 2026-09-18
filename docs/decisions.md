@@ -33,3 +33,12 @@ Os dois usuários do realm (`igor` com admin+user, `usuario` só com user) dão 
 
 ## Login forçado (onLoad: 'login-required')
 Preferi deixar o Keycloak barrar o acesso à aplicação inteira antes dela renderizar, em vez de deixar entrar e só bloquear rotas específicas depois. Pra um painel interno como esse faz mais sentido e simplifica a lógica de proteção de rota — não precisei de uma tela de "login" própria, o próprio Keycloak assume esse trabalho.
+
+## Revisão final: fechando pontas soltas de segurança
+Antes de fechar o projeto, dei uma passada geral procurando TODO e requisito que tivesse ficado pra trás. Encontrei três coisas:
+
+1. **`ValidateAudience` estava desligado** desde o Dia 1 (deixei um TODO no código). Como o token desse realm sai com `aud: "account"` por padrão (efeito das roles padrão do Keycloak, não de nenhuma configuração especial que eu tenha feito), liguei a validação de volta aceitando tanto `"account"` quanto o id do client (`hypesoft-frontend`), por segurança.
+2. **Rate limiting não existia** — o próprio README do desafio pede isso na seção de segurança e eu tinha deixado passar. Adicionei um limiter simples por IP (100 requisições/minuto) usando o `RateLimiter` nativo do ASP.NET Core, sem precisar de Redis ou infra extra.
+3. **Sem nenhum header de segurança** — adicionei os básicos (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`). Não é uma lista exaustiva, mas cobre os problemas mais óbvios (sniffing de MIME type, clickjacking, vazamento de referrer).
+
+Também limpei do frontend uns arquivos que sobraram do scaffold inicial do Vite (`App.css`, `src/assets`, `public/icons.svg`) que não eram mais usados por nada.

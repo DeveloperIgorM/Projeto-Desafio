@@ -1,4 +1,6 @@
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Serilog;
@@ -59,6 +61,11 @@ var keycloakAuthority = builder.Configuration["Keycloak:Authority"] ?? "http://k
 // rede interna do Docker ("keycloak"), mas quem loga acessa via "localhost" (porta publicada).
 var keycloakIssuer = builder.Configuration["Keycloak:ValidIssuer"] ?? "http://localhost:8080/realms/hypesoft";
 
+// Audience: nos tokens gerados por esse realm, o "aud" vem como "account" por padrao
+// (efeito colateral das roles default do Keycloak, que dao acesso ao client "account").
+// Deixo tambem o id do client do frontend na lista por seguranca, caso isso mude.
+var keycloakAudience = builder.Configuration["Keycloak:ValidAudience"] ?? "account";
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -66,7 +73,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         options.RequireHttpsMetadata = false; // OK em dev; habilitar HTTPS em producao
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidateAudience = false, // TODO: restringir para o client id quando os clients/roles estiverem definitivos (Dia 2/3)
+            ValidateAudience = true,
+            ValidAudiences = new[] { keycloakAudience, "hypesoft-frontend" },
             ValidateIssuer = true,
             ValidIssuer = keycloakIssuer
         };
@@ -75,6 +83,22 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 
 builder.Services.AddHealthChecks();
+
+// Rate limiting simples por IP - nao e nada elaborado, mas cobre o pedido do desafio
+// de ter alguma protecao contra abuso sem precisar de infraestrutura extra (tipo Redis).
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "desconhecido",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+});
 
 var app = builder.Build();
 
@@ -85,6 +109,19 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+// Headers de seguranca basicos - nada substitui HTTPS + um proxy tipo Nginx na frente
+// em producao, mas isso ja fecha os pontos mais obvios (sniffing de content-type,
+// clickjacking via iframe, vazamento de referrer).
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["Referrer-Policy"] = "no-referrer";
+    await next();
+});
+
+app.UseRateLimiter();
 
 app.UseCors("Frontend");
 app.UseAuthentication();
