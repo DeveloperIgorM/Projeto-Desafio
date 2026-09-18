@@ -110,4 +110,4 @@ keycloak/
 
 ## Vídeo
 
-Link do vídeo de demonstração: _a adicionar_.
+Link do vídeo de demonstração: https://www.loom.com/share/204f087bf81f4fb8b21d572dadfd7f5e
